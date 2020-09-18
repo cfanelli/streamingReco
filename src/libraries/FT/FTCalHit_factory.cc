@@ -15,6 +15,15 @@
 FTCalHit_factory::FTCalHit_factory() {
 	// TODO Auto-generated constructor stub
 	m_tt = 0;
+
+	//These parameters are hard-coded in java recon
+	// GEOMETRY PARAMETERS
+	CRYS_DELTA = 11.5;
+	CRYS_WIDTH = 15.3;													  // crystal width in mm
+	CRYS_LENGTH = 200.;													  // crystal length in mm
+//	CRYS_ZPOS = 1898.;
+	CRYS_ZPOS = 1923.; //Test 21 cm
+
 }
 
 FTCalHit_factory::~FTCalHit_factory() {
@@ -27,57 +36,26 @@ void FTCalHit_factory::Init() {
 void FTCalHit_factory::ChangeRun(const std::shared_ptr<const JEvent> &aEvent) {
 
 	//TODO: get the TT
-	std::cout << "FTCalHit_factory::ChangeRun run number: " << aEvent->GetRunNumber() << " " << aEvent->GetEventNumber() << std::endl;
-	m_tt = aEvent->GetSingle<TranslationTable>();
 
+	std::cout << "FTCalHit_factory::ChangeRun run number: " << aEvent->GetRunNumber() << " " << this << " " << m_tt << " " << std::endl;
+	if (m_tt == 0) {
+		//std::cout << "FTCalHit_factory::get TT" << std::endl;
+		m_tt = aEvent->GetSingle<TranslationTable>();
+		//	std::cout << "FTCalHit_factory: got TT" << std::endl;
+	}
 }
 void FTCalHit_factory::Process(const std::shared_ptr<const JEvent> &aEvent) {
 
 	TranslationTable::ChannelInfo m_channel;
-	TranslationTable::csc_t m_csc;
 
 	//Get the hits from FADC. Support bot the waveboard hit and the fa250VTPMode7 hit
 	auto faHits_waveboard = aEvent->Get<faWaveboardHit>();
 	auto faHits_fa250VTPMode7 = aEvent->Get<fa250VTPMode7Hit>();
+	std::vector<FTCalHit*> allHits;
 
 	for (auto faHit : faHits_waveboard) {
-		//Add here temporary code to change from the crate-slot-channel in the file I provided to Cristiano to
-		//something that is realistic according to the real FT-CAL geometry
 
-#define TEST_CODE
-		//Crate - slot - channel - id - x - y - hodo_sector - hodo_component - hodo_l1_slot - hodo_l1_channel - hodo_l2_slot - hodo_l2_channel
-		//{ 70, 6, 5, 61, 17, 2, 7, 3, 6, 1, 6, 14 }  //fake to channel 0
-		//{ 70, 6, 6, 83, 17, 3, 7, 4, 5, 0, 5, 9 }   //fake to channel 2
-		//{ 70, 5, 14, 82, 16, 3, 7, 7, 5, 1, 5, 8 }   //fake to channel 4
-		//{ 70, 5, 15, 60, 16, 2, 7, 6, 18, 3, 18, 9 }//fake to channel 6
-#ifdef TEST_CODE
-		if (faHit->m_channel.channel <= 6) {
-			m_csc.crate = 70;
-			switch (faHit->m_channel.channel) {
-			case 0:
-				m_csc.slot = 6;
-				m_csc.channel = 5;
-				break;
-			case 2:
-				m_csc.slot = 6;
-				m_csc.channel = 6;
-				break;
-			case 4:
-				m_csc.slot = 5;
-				m_csc.channel = 14;
-				break;
-			case 6:
-				m_csc.slot = 5;
-				m_csc.channel = 15;
-				break;
-			}
-		} else {
-			m_csc.crate = 72; // hodo crate to not have the TT library reporting errors
-			m_csc.slot = 6;
-			m_csc.channel = 1;
-		}
-#endif
-		m_channel = m_tt->getChannelInfo(m_csc);
+		m_channel = m_tt->getChannelInfo(faHit->m_channel);
 
 		if ((m_channel.det_sys == TranslationTable::FTCAL)) {
 			//Convert the waveboard hit. Probably will never be used, unless we will perform FT tests with waveboard.
@@ -96,13 +74,20 @@ void FTCalHit_factory::Process(const std::shared_ptr<const JEvent> &aEvent) {
 			ftCalHit->m_channel.iX = (ftCalHit->m_channel.component + 1) - (ftCalHit->m_channel.iY - 1) * 22;
 
 			//Assign the time
-			ftCalHit->setTime(faHit->m_time);
+			ftCalHit->setHitTime(4 * faHit->m_time.count());
 
 			//Assign the energy
 			//TODO: eventually apply another correction, here I just take the energy as provided by VTP
-			ftCalHit->setEnergy(faHit->m_charge);
+			ftCalHit->setHitEnergy(faHit->m_charge);
 
-			mData.push_back(ftCalHit);
+			//Assign the position
+			ftCalHit->setHitX((ftCalHit->m_channel.iX - CRYS_DELTA) * CRYS_WIDTH);
+			ftCalHit->setHitY((ftCalHit->m_channel.iY - CRYS_DELTA) * CRYS_WIDTH);
+			ftCalHit->setHitZ(CRYS_ZPOS);
+
+			allHits.push_back(ftCalHit);
+
+			//mData.push_back(ftCalHit);
 		}
 	}
 
@@ -124,15 +109,44 @@ void FTCalHit_factory::Process(const std::shared_ptr<const JEvent> &aEvent) {
 			ftCalHit->m_channel.iX = (ftCalHit->m_channel.component + 1) - (ftCalHit->m_channel.iY - 1) * 22;
 
 			//Assign the time
-			ftCalHit->setTime(faHit->m_time);
+			if (ftCalHit->m_channel.iX >= 12 || ftCalHit->m_channel.component == 224 || ftCalHit->m_channel.component == 242 || ftCalHit->m_channel.component == 360
+					|| ftCalHit->m_channel.component == 445 || ftCalHit->m_channel.component == 96) {
+				ftCalHit->setHitTime(4 * faHit->m_time.count() - 19.5);
+			} else {
+				ftCalHit->setHitTime(4 * faHit->m_time.count());
+			}
+//			ftCalHit->setHitTime(4 * faHit->m_time.count());
 
 			//Assign the energy
 			//TODO: eventually apply another correction, here I just take the energy as provided by VTP
-			ftCalHit->setEnergy(faHit->m_charge);
+			ftCalHit->setHitEnergy(faHit->m_charge);
 
-			mData.push_back(ftCalHit);
+			//Assign the position
+			ftCalHit->setHitX((ftCalHit->m_channel.iX - CRYS_DELTA) * CRYS_WIDTH);
+			ftCalHit->setHitY((ftCalHit->m_channel.iY - CRYS_DELTA) * CRYS_WIDTH);
+			ftCalHit->setHitZ(CRYS_ZPOS);
+
+			allHits.push_back(ftCalHit);
+
+			//mData.push_back(ftCalHit);
 		}
 	}
 
+	//If you want all data, you need to comment this loop and to uncomment the //mData.push_back in the previous loop.
+	for (int i = 0; i < allHits.size(); i++) {
+		bool flag = false;
+		for (int j = 0; j < allHits.size(); j++) {
+			if (i != j && allHits[i]->getHitIX() == allHits[j]->getHitIX() && allHits[i]->getHitIY() == allHits[j]->getHitIY() && allHits[i]->getHitTime() - allHits[j]->getHitTime() < 160
+					&& allHits[i]->getHitTime() - allHits[j]->getHitTime() > 0 && allHits[i]->getHitEnergy() - allHits[j]->getHitEnergy() < 0) {
+				flag = true;
+				break;
+			}
+		}
+		if (flag == true) {
+			delete allHits[i];
+		} else {
+			mData.push_back(allHits[i]);
+		}
+	}
 }
 

@@ -1,0 +1,5 @@
+plugins hallBFT_hdbscan,hallBFT_monitoring
+hallBFT_hdbscan:output_file out_hdbscan_092_F00000001.root
+hallBFT_monitoring:output_file out_monit_092_F00000001.root
+RUNTYPE HALLB
+nthreads 12

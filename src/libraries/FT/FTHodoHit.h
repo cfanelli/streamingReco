@@ -17,20 +17,44 @@ public:
 	FTHodoHit();
 	virtual ~FTHodoHit();
 
-	float getEnergy() const {
+	float getHitEnergy() const {
 		return energy;
 	}
 
-	void setEnergy(float charge) {
-		this->energy = energy;
+	void setHitEnergy(float charge) {
+		this->energy = charge;
 	}
 
-	T4nsec getTime() const {
+	float getHitTime() const {
 		return time;
 	}
 
-	void setTime(T4nsec time) {
+	void setHitTime(float time) {
 		this->time = time;
+	}
+
+	double getHitDx()const{
+		return Dx;
+	}
+
+	double getHitDy()const{
+		return Dy;
+	}
+
+	double getHitDz()const{
+		return Dz;
+	}
+
+	void setDx(double value){
+		this->Dx=value;
+	}
+
+	void setDy(double value){
+		this->Dy=value;
+	}
+
+	void setDz(double value){
+		this->Dz=value;
 	}
 
 	TranslationTable::FTHODO_Index_t m_channel;
@@ -38,8 +62,11 @@ public:
 protected:
 
 private:
-	T4nsec time;
+	float time;
 	float energy;
+	double Dx;
+	double Dy;
+	double Dz;
 };
 
 #endif /* SRC_LIBRARIES_FT_FTHODOHIT_H_ */
